@@ -20,6 +20,7 @@
 #include "audio_common.h"
 #include "buf_manager.h"
 #include "debug_utils.h"
+#include "AudioProcessor.h"
 
 class AudioPlayer {
     // buffer queue player interfaces
@@ -32,6 +33,8 @@ class AudioPlayer {
     AudioQueue *freeQueue_;       // user
     AudioQueue *playQueue_;       // user
     AudioQueue *devShadowQueue_;  // owner
+
+    AudioProcessor *processor_;
 
     ENGINE_CALLBACK callback_;
     void           *ctx_;

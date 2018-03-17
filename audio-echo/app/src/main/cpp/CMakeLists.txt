@@ -7,6 +7,7 @@ add_library(echo SHARED
             audio_main.cpp
             audio_player.cpp
             audio_recorder.cpp
+            AudioProcessor.cpp
             debug_utils.cpp)
 
 # include libraries needed for hello-jni lib

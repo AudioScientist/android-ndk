@@ -64,6 +64,8 @@ void AudioPlayer::ProcessSLCallback(SLAndroidSimpleBufferQueueItf bq) {
           return;
         }
 
+        processor_->process(buf);
+
       devShadowQueue_->push(buf);
       (*bq)->Enqueue(bq, buf->buf_, buf->size_);
       playQueue_->pop();
@@ -81,6 +83,9 @@ void AudioPlayer::ProcessSLCallback(SLAndroidSimpleBufferQueueItf bq) {
     for (int32_t idx = 0; idx < PLAY_KICKSTART_BUFFER_COUNT; idx++) {
         playQueue_->front(&buf);
         playQueue_->pop();
+
+        processor_->process(buf);
+
         devShadowQueue_->push(buf);
         (*bq)->Enqueue(bq, buf->buf_, buf->size_);
     }
@@ -89,7 +94,7 @@ void AudioPlayer::ProcessSLCallback(SLAndroidSimpleBufferQueueItf bq) {
 
 AudioPlayer::AudioPlayer(SampleFormat *sampleFormat, SLEngineItf slEngine) :
     freeQueue_(nullptr), playQueue_(nullptr), devShadowQueue_(nullptr),
-    callback_(nullptr)
+    processor_(nullptr), callback_(nullptr)
 {
     SLresult result;
     assert(sampleFormat);
@@ -144,6 +149,9 @@ AudioPlayer::AudioPlayer(SampleFormat *sampleFormat, SLEngineItf slEngine) :
 
     result = (*playItf_)->SetPlayState(playItf_, SL_PLAYSTATE_STOPPED);
     SLASSERT(result);
+
+    // create audio processor
+    processor_ = new AudioProcessor(sampleFormat);
 
     // create an empty queue to track deviceQueue
     devShadowQueue_ = new AudioQueue(DEVICE_SHADOW_BUFFER_QUEUE_LEN);
