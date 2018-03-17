@@ -18,10 +18,16 @@ public:
 private:
 
     SampleFormat sampleInfo_;
-    sample_buf internalBuffer_;
-    float phase;
-    float frequency;
-    float phaseIncrement;
+    sample_buf memoryBuffer_;
+    //float phase;
+    //float frequency;
+    //float phaseIncrement;
+
+    float delaySeconds;
+    float feedback;
+
+    uint32_t delaySamples;
+    uint32_t memoryReadPosition;
 };
 
 
