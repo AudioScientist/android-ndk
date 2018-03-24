@@ -30,6 +30,40 @@
 void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *ctx) {
     (static_cast<AudioPlayer *>(ctx))->ProcessSLCallback(bq);
 }
+
+
+void convertSystemAudioToFloatAudio(sample_buf * systemBuffer, float * floatBuffer, int numberFrames) {
+
+    int16_t* systemAudioData = (int16_t*)(systemBuffer->buf_);
+
+    float int16Max = static_cast<float>(INT16_MAX);
+    float int16Min = static_cast<float>(INT16_MIN);
+
+    int i = numberFrames+1;
+    while (--i) {
+        *floatBuffer = *systemAudioData >= 0 ? static_cast<float>(*systemAudioData) / int16Max : static_cast<float>(-*systemAudioData) / int16Min;
+        ++floatBuffer;
+        ++systemAudioData;
+    }
+}
+
+
+void convertFloatAudioToSystemAudio(float * floatBuffer, sample_buf * systemBuffer, int numberFrames) {
+
+    int16_t* systemAudioData = (int16_t*)(systemBuffer->buf_);
+
+    float int16Max = static_cast<float>(INT16_MAX);
+    float int16Min = static_cast<float>(INT16_MIN);
+
+    int i = numberFrames+1;
+    while (--i) {
+        *systemAudioData = *floatBuffer > 0 ? static_cast<int16_t>(*floatBuffer*int16Max) : static_cast<int16_t>(-*floatBuffer*int16Min);
+        ++floatBuffer;
+        ++systemAudioData;
+    }
+}
+
+
 void AudioPlayer::ProcessSLCallback(SLAndroidSimpleBufferQueueItf bq) {
 #ifdef ENABLE_LOG
     logFile_->logTime();
@@ -64,7 +98,9 @@ void AudioPlayer::ProcessSLCallback(SLAndroidSimpleBufferQueueItf bq) {
           return;
         }
 
-        processor_->process(buf);
+        convertSystemAudioToFloatAudio(buf, processBuffer_, sampleInfo_.framesPerBuf_);
+        ap_process(processor_, processBuffer_, sampleInfo_.framesPerBuf_);
+        convertFloatAudioToSystemAudio(processBuffer_, buf, sampleInfo_.framesPerBuf_);
 
       devShadowQueue_->push(buf);
       (*bq)->Enqueue(bq, buf->buf_, buf->size_);
@@ -84,13 +120,16 @@ void AudioPlayer::ProcessSLCallback(SLAndroidSimpleBufferQueueItf bq) {
         playQueue_->front(&buf);
         playQueue_->pop();
 
-        processor_->process(buf);
+        convertSystemAudioToFloatAudio(buf, processBuffer_, sampleInfo_.framesPerBuf_);
+        ap_process(processor_, processBuffer_, sampleInfo_.framesPerBuf_);
+        convertFloatAudioToSystemAudio(processBuffer_, buf, sampleInfo_.framesPerBuf_);
 
         devShadowQueue_->push(buf);
         (*bq)->Enqueue(bq, buf->buf_, buf->size_);
     }
 
 }
+
 
 AudioPlayer::AudioPlayer(SampleFormat *sampleFormat, SLEngineItf slEngine) :
     freeQueue_(nullptr), playQueue_(nullptr), devShadowQueue_(nullptr),
@@ -151,7 +190,8 @@ AudioPlayer::AudioPlayer(SampleFormat *sampleFormat, SLEngineItf slEngine) :
     SLASSERT(result);
 
     // create audio processor
-    processor_ = new AudioProcessor(sampleFormat);
+    processor_ = new_audio_processor(1.0f);
+    processBuffer_ = (float*)calloc(sampleInfo_.framesPerBuf_, sizeof(float));
 
     // create an empty queue to track deviceQueue
     devShadowQueue_ = new AudioQueue(DEVICE_SHADOW_BUFFER_QUEUE_LEN);
@@ -198,6 +238,9 @@ AudioPlayer::~AudioPlayer() {
     }
 
     delete [] silentBuf_.buf_;
+
+    destroy_audio_processor(processor_);
+    free(processBuffer_);
 }
 
 void AudioPlayer::SetBufQueue(AudioQueue *playQ, AudioQueue *freeQ) {
